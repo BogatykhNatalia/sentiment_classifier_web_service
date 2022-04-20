@@ -4,17 +4,36 @@ import socket
 import sys
 from urllib.parse import urlparse, parse_qs
 from libs.HF_classifier import HuggingFaceTextClassifier
+from libs.SVM_classifier import SVMTextClassifier
 import json
 import numpy as np
 import pandas as pd
-# from tqdm import tqdm
+import torch
 import cgi
+from argparse import ArgumentParser
 
-model_name = 'Tatyana/rubert-base-cased-sentiment-new'.replace('/','_')
-MY_IP = '0.0.0.0'
-PORT = 80
+parser = ArgumentParser()
+parser.add_argument('--host',type=str,default='0.0.0.0')
+parser.add_argument('--port',type=int,default=80)
+parser.add_argument('--mode',type=str,default='svm',help = 'svm or huggingface')
+parser.add_argument('--device',type=str,default='gpu',help = 'cpu or gpu')
+args = parser.parse_args()
 
-classifier = HuggingFaceTextClassifier(model_name)
+MY_IP =args.host#'0.0.0.0'
+PORT = args.port#80
+mode = args.mode#'svm'
+if args.device=='gpu':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if args.device=='cpu':
+    device = torch.device('cpu')
+
+if mode == 'huggingface':    
+    model_name = 'Tatyana/rubert-base-cased-sentiment-new'.replace('/','_')
+    classifier = HuggingFaceTextClassifier(model_name,device)
+    
+if mode =='svm':    
+    model_name = 'sentence-transformers/distiluse-base-multilingual-cased-v1'.replace('/','_')
+    classifier = SVMTextClassifier(model_name,device)
 
 class Server(BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -24,7 +43,7 @@ class Server(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers()        
-        self.wfile.write(json.dumps({'hello': 'world', 'received': 'ok'}).encode('utf-8'))
+        self.wfile.write(json.dumps({'what should i do': 'you should do POST request', 'is this thing working': 'yes'}).encode('utf-8'))
         return
 
     def do_HEAD(self):
@@ -37,6 +56,7 @@ class Server(BaseHTTPRequestHandler):
         print(str_data)
         self._set_headers()
         text_class = classifier.classify(str_data['text'][0])
+        print(text_class)
         columns = ['NEUTRAL','POSITIVE','NEGATIVE']
         message = pd.DataFrame(data =text_class, columns=columns).iloc[0].to_dict()
         message['received'] = 'ok'        
@@ -52,9 +72,4 @@ def run(server_class=HTTPServer, handler_class=Server, port=PORT):
     httpd.serve_forever()
     
 if __name__ == "__main__":
-    from sys import argv
-    
-    if len(argv) == 2:
-        run(port=int(argv[1]))
-    else:
-        run()
+    run()

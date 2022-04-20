@@ -7,7 +7,7 @@ RUN apt-get update --fix-missing && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
     
-RUN pip install numpy --no-cache-dir pandas transformers argparse --no-cache-dir 
+RUN pip install numpy --no-cache-dir pandas transformers sentence_transformers argparse sklearn --no-cache-dir 
 
 WORKDIR /
 
