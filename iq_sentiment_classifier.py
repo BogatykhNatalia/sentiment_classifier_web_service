@@ -34,6 +34,14 @@ if mode == 'huggingface':
 if mode =='svm':    
     model_name = 'sentence-transformers/distiluse-base-multilingual-cased-v1'.replace('/','_')
     classifier = SVMTextClassifier(model_name,device)
+    
+def create_message(text):    
+    text_class = classifier.classify(text)
+    print(text_class)
+    columns = ['NEUTRAL','POSITIVE','NEGATIVE']
+    message = pd.DataFrame(data =text_class, columns=columns).iloc[0].to_dict()
+    message['received'] = 'ok' 
+    return message
 
 class Server(BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -41,34 +49,34 @@ class Server(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
 
-    def do_GET(self):
-        self._set_headers()        
-        self.wfile.write(json.dumps({'what should i do': 'you should do POST request', 'is this thing working': 'yes'}).encode('utf-8'))
+    def do_GET(self):     
+        self._set_headers()
+        parse_dict = parse_qs(urlparse(self.path).query)
+        str_data = parse_dict
+        print(str_data)
+        message = create_message(str_data['text'][0])
+        self.wfile.write(json.dumps(message).encode('utf-8'))
         return
 
     def do_HEAD(self):
         self._set_headers()
         return
 
-    def do_POST(self):        
-        parse_dict = parse_qs(urlparse(self.path).query)
-        str_data = parse_dict
+    def do_POST(self):   
+        self._set_headers()  
+        length = int(self.headers.get('Content-Length'))
+        data = self.rfile.read(length)
+        str_data = json.loads(data.decode()) 
         print(str_data)
-        self._set_headers()
-        text_class = classifier.classify(str_data['text'][0])
-        print(text_class)
-        columns = ['NEUTRAL','POSITIVE','NEGATIVE']
-        message = pd.DataFrame(data =text_class, columns=columns).iloc[0].to_dict()
-        message['received'] = 'ok'        
+        message = create_message(str_data['text'])
         self.wfile.write(json.dumps(message).encode('utf-8'))
         return 
 
 def run(server_class=HTTPServer, handler_class=Server, port=PORT):
-    print(MY_IP, port)
     server_address = (MY_IP, port)
     httpd = server_class(server_address, handler_class)
     
-    print(f'Starting httpd on port {MY_IP}:{port}...')
+    print(f'http://YOUR_IP:{port}/')
     httpd.serve_forever()
     
 if __name__ == "__main__":
